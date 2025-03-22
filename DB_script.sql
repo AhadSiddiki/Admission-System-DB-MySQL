@@ -1,5 +1,6 @@
--- Ahad Siddiki - 371
+-- Ahad Siddiki - 371 - JU
 -- Create the database schema
+DROP DATABASE IF EXISTS uni_admission_371;
 CREATE DATABASE IF NOT EXISTS uni_admission_371;
 USE uni_admission_371;
 
@@ -26,8 +27,6 @@ CREATE TABLE IF NOT EXISTS applicant_login (
     email VARCHAR(50) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     last_login DATETIME DEFAULT NULL,
-    login_attempts INT DEFAULT 0,
-    account_locked BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (login_id),
@@ -49,7 +48,7 @@ CREATE TABLE IF NOT EXISTS exam_units (
     center_id INT NOT NULL,
     exam_date DATE NOT NULL,
     exam_time TIME NOT NULL,
-    exam_duration INT DEFAULT 120, -- Duration in minutes
+    exam_duration INT DEFAULT 60, -- Duration in minutes
     PRIMARY KEY (unit_id),
     FOREIGN KEY (center_id) REFERENCES exam_center(center_id) ON DELETE CASCADE
 );
@@ -74,7 +73,6 @@ CREATE TABLE IF NOT EXISTS payment (
     fee_amount DECIMAL(10, 2) NOT NULL,
     payment_datetime DATETIME DEFAULT NULL,
     payment_status ENUM('Paid', 'Pending', 'Failed') NOT NULL,
-    payment_method ENUM('Credit Card', 'Bank Transfer', 'Cash', 'Mobile Payment') NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (payment_id),
     FOREIGN KEY (applicant_id) REFERENCES applicant_info(applicant_id) ON DELETE CASCADE
@@ -85,8 +83,8 @@ CREATE TABLE IF NOT EXISTS result (
     result_id INT NOT NULL AUTO_INCREMENT,
     applicant_id INT NOT NULL,
     unit_id INT NOT NULL,
-    total_marks INT DEFAULT NULL,
-    marks_obtained DECIMAL(5, 2) DEFAULT NULL,
+    total_marks INT DEFAULT 80,
+    marks_obtained FLOAT DEFAULT NULL CHECK (marks_obtained BETWEEN 0.00 AND 80.0),
     status ENUM('Passed', 'Failed', 'Pending') DEFAULT 'Pending',
     result_published TIMESTAMP DEFAULT NULL,
     PRIMARY KEY (result_id),
@@ -96,9 +94,6 @@ CREATE TABLE IF NOT EXISTS result (
 
 -- ================================================================
 -- Sample Data Insertion (For Testing Purpose)
--- Note: Remember that passwords need to be hashed before inserting in the real-world scenario.
--- We can use libraries like bcrypt or Argon2 for password hashing.
--- Here, we are using placeholders for hashed passwords.
 -- ================================================================
 
 -- Sample applicant registration and login
@@ -107,14 +102,24 @@ CREATE TABLE IF NOT EXISTS result (
 -- Inserting data for applicant_info
 INSERT INTO applicant_info (first_name, last_name, date_of_birth, gender, phone_number, email, address, ssc_gpa, hsc_gpa)
 VALUES
-('Nahid', 'Islam', '2006-01-20', 'Male', '01824900698', 'nahid.islam20@gmail.com', 'Khejurtek, Savar, Dhaka', 5.00, 4.92),
-('Kayes', 'Mahmud', '2006-05-15', 'Male', '01824900099', 'kayes.mahmud@gmail.com', '22 mile, Savar, Dhaka', 5.00, 5.00);
+('Nahid', 'Islam', '2006-01-20', 'Male', '01824900698', 'nahid@gmail.com', 'Khejurtek, Savar, Dhaka', 5.00, 4.92),
+('Kayes', 'Mahmud', '2006-05-15', 'Male', '01824900099', 'kayes@gmail.com', '22 mile, Savar, Dhaka', 5.00, 5.00),
+('Joy', 'Khan', '2005-03-20', 'Male', '01755500698', 'joy@gmail.com', 'Ishardi, Pabna, Rajshahi', 4.55, 5.00),
+('Tarek', 'Islam', '2007-09-10', 'Male', '01725500099', 'tarek@gmail.com', 'Mirpur 12, Dhaka', 4.50, 5.00),
+('Shahed', 'Alom', '2006-10-20', 'Male', '01887400698', 'shahed@gmail.com', 'Sadapathor, Volaganj, Shylet', 4.88, 5.00),
+('Jesan', 'Islam', '2007-01-05', 'Male', '01843844498', 'jesan@gmail.com', 'Chandanaish, Chittagong', 5.00, 5.00),
+('Khaled', 'Mahmud', '2006-05-15', 'Male', '01877777099', 'khaled@gmail.com', 'Jamgora, Ashulia, Dhaka', 3.92, 4.90);
 
 -- Sample login credentials for applicant_login (storing hashed passwords)
 INSERT INTO applicant_login (email, password_hash)
 VALUES
-('nahid.islam20@gmail.com', 'hashed_password_1'),
-('kayes.mahmud@gmail.com', 'hashed_password_2');
+('nahid@gmail.com', SHA2('nahid', 256)),
+('kayes@gmail.com', SHA2('kayes', 256)),
+('joy@gmail.com', SHA2('joy', 256)),
+('tarek@gmail.com', SHA2('tarek', 256)),
+('shahed@gmail.com', SHA2('shahed', 256)),
+('jesan@gmail.com', SHA2('jesan', 256)),
+('khaled@gmail.com', SHA2('khaled', 256));
 
 -- Sample exam centers data
 INSERT INTO exam_center (center_name, center_address)
@@ -135,57 +140,39 @@ VALUES
 (220432, 2, 2, 102);
 
 -- Sample payment data
-INSERT INTO payment (applicant_id, fee_amount, payment_datetime, payment_status, payment_method)
+INSERT INTO payment (applicant_id, fee_amount, payment_datetime, payment_status)
 VALUES
-(1, 500.00, '2024-01-20 12:00:00', 'Paid', 'Credit Card'),
-(2, 500.00, '2024-01-21 12:00:00', 'Pending', 'Bank Transfer');
+(1, 500.00, '2024-01-20 12:00:00', 'Paid'),
+(2, 500.00, '2024-01-21 12:00:00', 'Pending');
 
 -- Sample result data (exam results)
-INSERT INTO result (applicant_id, unit_id, total_marks, marks_obtained, status)
+INSERT INTO result (applicant_id, unit_id, marks_obtained, status)
 VALUES
-(1, 1, 100, 87.5, 'Passed'),
-(2, 2, 100, 90.0, 'Passed');
-
--- ================================================
--- Trigger for Audit Log: Track login attempts
--- ================================================
--- Step 1: Create the audit_log table to store audit actions
-CREATE TABLE IF NOT EXISTS audit_log (
-    log_id INT NOT NULL AUTO_INCREMENT,
-    action_type VARCHAR(255) NOT NULL,
-    user_email VARCHAR(100) NOT NULL,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (log_id)
-);
-
--- Step 2: Trigger to monitor login attempts and account locks
-DELIMITER //
-
-CREATE TRIGGER track_login_attempts
-AFTER UPDATE ON applicant_login
-FOR EACH ROW
-BEGIN
-    IF OLD.account_locked = FALSE AND NEW.account_locked = TRUE THEN
-        INSERT INTO audit_log (action_type, user_email, timestamp)
-        VALUES ('Account Locked', NEW.email, CURRENT_TIMESTAMP);
-    END IF;
-END//
-
-DELIMITER ;
+(1, 1, 75.5, 'Passed'),
+(2, 2, 60.0, 'Passed'),
+(3, 1, 57.0, 'Passed'),
+(4, 1, 63.0, 'Passed'),
+(5, 1, 72.75, 'Passed'),
+(6, 1, 71.25, 'Passed'),
+(7, 1, 67.75, 'Passed');
 
 -- ================================================
 -- View for Applicant Dashboard
 -- ================================================
-CREATE VIEW applicant_dashboard AS
+CREATE OR REPLACE VIEW applicant_dashboard AS
 SELECT
     ai.applicant_id,
     ai.first_name,
     ai.last_name,
     ai.ssc_gpa,
     ai.hsc_gpa,
-    e.unit_code,
-    r.marks_obtained,
-    r.status AS result_status
+    COALESCE(e.unit_code, 'N/A') AS unit_code, -- Replace NULL unit_code with 'N/A'
+    COALESCE(r.marks_obtained, 0) AS marks_obtained, -- If marks_obtained is NULL, replace with 0
+    COALESCE(r.status, 'Pending') AS result_status, -- Default to 'Pending' if status is NULL
+    CASE
+        WHEN r.marks_obtained IS NULL THEN 'N/A' -- If marks are NULL, show 'N/A'
+        ELSE DENSE_RANK() OVER (PARTITION BY COALESCE(e.unit_code, 'N/A') ORDER BY r.marks_obtained DESC) -- Otherwise, calculate merit position
+    END AS merit_position
 FROM applicant_info ai
 LEFT JOIN result r ON ai.applicant_id = r.applicant_id
 LEFT JOIN exam_units e ON r.unit_id = e.unit_id;
